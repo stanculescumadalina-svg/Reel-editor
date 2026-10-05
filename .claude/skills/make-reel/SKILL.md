@@ -26,13 +26,23 @@ python -m reel scan "<folder>"
 ```
 
 This writes `<folder>/_reel/clips.json` (length, orientation, capture time, GPS if
-present) and one contact sheet per clip in `<folder>/_reel/sheets/`. Each sheet is a 3×2
-grid of frames evenly spaced through the clip; `sheet_times` in clips.json gives the
-timestamp of each frame (left to right, top row first).
+present) and one contact sheet per clip in `<folder>/_reel/sheets/`. Each sheet is a grid
+of frames evenly spaced through the clip: 6 frames (3×2) for short clips, up to 12 (4×3)
+for long ones. `sheet_times` in clips.json gives the timestamp of each frame (left to
+right, top row first).
 
-**Read every contact sheet image.** For each clip, note what it shows, the best moment
-(which frame), whether there's movement, people, food, landmarks, signage, light (day,
-golden hour, night), and how strong it is visually. That's your shot log.
+**Read every contact sheet image** and keep a shot log. Raw phone footage is mostly
+unusable, so be a picky editor. For each clip:
+- **Usable window(s)**: the stretch that actually works, as `in`–`out` seconds from
+  `sheet_times`. Cut out the start and end (pointing the phone, adjusting, walking off),
+  shaky or blurry parts, pocket shots, people blocking the view, and dark or overexposed
+  bits. A 40 s clip often has one good 2–3 s moment. One clip can have several separate
+  good moments, and each can become its own shot.
+- **What it shows**: movement, people, food, landmarks, signage, light (day, golden
+  hour, night), and how strong it is visually.
+- **Keep or skip**: skip a clip entirely if it's weak, a near-duplicate of a better
+  clip, or doesn't fit the story. Not every clip belongs in the reel; usually a third to a
+  half of the footage gets left out. Record each skipped clip with a short reason.
 
 ## 3. Write the story
 
@@ -51,14 +61,22 @@ Think like a vlogger, not a slideshow. A good reel is a tiny story with a feelin
 - **Rhythm**: vary shot lengths. Quick 1–2 beat cuts for movement and energy, a longer
   4–8 beat hold on a beautiful or emotional shot (sunset, view, friends laughing) so the
   viewer can breathe. Put the peak shot on a longer hold near the end.
-- **Text as narration**: since there's no voice, on-screen text tells the story.
-  - Scene labels are short, lowercase or small-caps diary notes, max ~6 words:
-    "saturday 10am ☕", "first time trying sardines", "SAT · 22:00 · BAIRRO ALTO".
-  - The travel style suits time/place stamps. Other styles suit casual diary lines.
-  - Don't label every shot. Label the start of each mini-scene (every 2–4 shots).
-  - Use at most one emoji per label.
-- **Landing**: an outro line that invites a save, share or follow, tied to the story:
-  "save this for your Lisbon trip", "which one would you do first?", "part 2?".
+- **On-screen text**: choose it per reel, not by habit. Set `text_mode`:
+  - `"hook"` (**default**): only the opening hook line, plus an outro line if it adds
+    something. The footage and music carry the story. Use this for most reels.
+  - `"none"`: no text at all, for a clean aesthetic or "vibe" reel. The user can type
+    text in CapCut themselves.
+  - `"story"`: the hook plus scene labels. Use it only when labels add real information
+    or the user asks for it: a day-timeline ("SAT · 10:00 · BAIXA"), a list reel
+    ("3 things I love about Porto": "1. the trams"), a before/after, or a funny running
+    commentary ("me pretending I know where I'm going"). Label the start of a mini-scene
+    (every 3–5 shots at most), never every shot, and keep each label to about 6 words
+    with at most one emoji.
+  If the user has said how they like text, follow that. Otherwise use `"hook"` and mention
+  in your hand-off that labels or no text are one rebuild away.
+- **Landing**: optionally an outro line that invites a save, share or follow, tied to the
+  story: "save this for your Lisbon trip", "which one would you do first?", "part 2?".
+  If nothing natural comes to mind, leave it out.
 - **Length**: 12–25 s for punchy/hype/night-out (about 24–48 beats at 120 BPM), up to
   ~30 s for travel/golden. Shorter is better than padded. Leave weak shots out.
 
@@ -81,15 +99,21 @@ Save it as `<folder>/_reel/plan.json`:
   "style": "travel",
   "music": "song.mp3",
   "music_start": "auto",
+  "text_mode": "hook",
   "hook": "POV: your first weekend living in Lisbon",
   "hook_beats": 4,
   "scenes": [
-    {"clip": "IMG_2041.MOV", "in": 3.5, "beats": 2, "emphasis": true, "note": "tram passing, best frame 3"},
-    {"clip": "IMG_2033.MOV", "in": 0.0, "beats": 2, "text": "SAT · 10:00 · BAIXA", "note": "coffee pour"},
+    {"clip": "IMG_2041.MOV", "in": 3.5, "out": 5.0, "beats": 2, "emphasis": true, "note": "tram passing"},
+    {"clip": "IMG_2033.MOV", "in": 6.0, "out": 9.5, "beats": 2, "note": "coffee pour, skip the fumbling at the start"},
     {"clip": "IMG_2034.JPG", "beats": 1},
-    {"clip": "IMG_2050.MOV", "in": 12.0, "beats": 2, "speed": 2.0, "note": "walking timelapse"},
-    {"clip": "IMG_2077.MOV", "in": 1.0, "beats": 8, "speed": 0.5, "note": "sunset hold, slow-mo"}
+    {"clip": "IMG_2050.MOV", "in": 12.0, "out": 20.0, "beats": 2, "speed": 2.0, "note": "walking timelapse"},
+    {"clip": "IMG_2033.MOV", "in": 14.0, "out": 16.0, "beats": 2, "note": "second good moment: first sip"},
+    {"clip": "IMG_2077.MOV", "in": 1.0, "out": 6.0, "beats": 8, "speed": 0.5, "note": "sunset hold, slow-mo"}
   ],
+  "skipped": {
+    "IMG_2035.MOV": "shaky, pointing at the floor most of the time",
+    "IMG_2052.MOV": "same view as IMG_2050 but worse light"
+  },
   "outro": "save this for your Lisbon trip ✈️",
   "caption": "first weekend as a Lisbon local 🇵🇹 still can't believe this is my life now",
   "hashtags": ["lisbon", "expatlife", "movingabroad", "weekendvlog", "lisboa"]
@@ -98,12 +122,16 @@ Save it as `<folder>/_reel/plan.json`:
 
 Scene fields:
 - `clip` (required): file name exactly as in clips.json.
-- `in`: seconds into the clip where the shot starts. Aim at the best moment from the
-  contact sheet (`sheet_times`). The tool pulls it back automatically if the clip is too short.
+- `in` / `out`: the usable window, in seconds into the clip. The tool **never uses footage
+  outside it**. Without `out`, the window runs to the end of the clip.
+  - The shot starts at `in` (or ends at `out`, if you add `"align": "end"`, which suits
+    a moment that peaks at the end of the window, like a cheers or a jump).
+  - If the window is shorter than the requested beats, the shot is shortened to fit.
+    If even one beat doesn't fit, the footage is slowed down. Both cases print a warning.
 - `beats`: shot length in beats (1 beat ≈ 0.5 s at 120 BPM). Default comes from the style.
 - `speed`: 2.0 for walking/driving/timelapse energy, 0.5 for slow-mo on beautiful moments.
-  If a clip is too short for its beats, the tool slows it down and prints a warning.
-- `text`: an on-screen label starting at this shot.
+  Slow-mo needs half as much footage, so it rescues short good moments.
+- `text`: an on-screen label starting at this shot. It only shows when `text_mode` is `"story"`.
 - `emphasis`: true for 2–4 standout shots (the hook shot, the peak). They get a zoom-in
   intro animation (and a beat effect in hype/night-out).
 - `frame`: `"auto"` (default: portrait fills the frame, landscape sits on a blurred
@@ -114,7 +142,10 @@ Scene fields:
 - `keep_audio`: true to keep the clip's own sound under the music (laughter, crowd, waves).
 - `note`: your reminder of what's in the shot. Ignored by the tool.
 
-Top-level fields: `music` is a file name in the folder or null. `music_start` is
+Top-level fields: `text_mode` is `"hook"`, `"none"` or `"story"` (see step 3).
+`hook` and `outro` are optional; leave either empty for no line. `skipped` maps each
+clip you left out to a short reason; the CLI lists every unused clip so nothing is
+dropped silently. `music` is a file name in the folder or null. `music_start` is
 `"auto"` (starts at the most energetic part of the song) or a number of seconds.
 `bpm` is used only when there's no music (default 120). `caption` and `hashtags` hold
 the Instagram caption: 3–5 specific hashtags beat 30 generic ones.
@@ -140,6 +171,8 @@ with the same title.
 Tell the user:
 - the draft name to open in CapCut (restart CapCut if it doesn't show up)
 - the story in 2–3 lines (hook → arc → ending), so they can ask for changes
+- which clips you left out and why (one line each), so they can ask for a favourite back
+- the text mode you used, and that switching is quick (`--text none|hook|story`)
 - the caption and hashtags, ready to paste
 - what to check in CapCut: text positions and the music, and swapping in a trending
   sound if they used no music file

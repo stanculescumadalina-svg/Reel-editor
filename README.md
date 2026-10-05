@@ -18,7 +18,13 @@ your clips ──► scan (contact sheets) ──► Claude watches & writes the
 
 What you get in CapCut:
 - 9:16 vertical timeline with cuts landing on the beat of your song
-- a hook line on screen for the first seconds, diary labels per scene, and an outro line
+- only the good parts of each clip (Claude marks the usable seconds of every clip and
+  never uses the shaky start or the bit where you put the phone away). Weak or duplicate
+  clips are left out, and Claude tells you which ones and why
+- on-screen text the way you want it for that reel:
+  - `hook` (default): just an opening line, plus an optional closing line
+  - `none`: no text at all
+  - `story`: also short labels like `SAT · 10:00 · ALFAMA` or "1. the trams"
 - transitions, zoom-in emphasis on the best shots, a slow push-in on every clip
 - a colour filter and effects that match the chosen style
 - landscape clips placed on a blurred background, portrait clips filling the frame
@@ -31,7 +37,7 @@ What you get in CapCut:
 | `punchy` (default) | 2-beat cuts, snap/whip transitions, bold text | weekend recaps, day in my life, activities |
 | `hype` | 1-beat cuts, flashes, beat effect | parties, festivals, concerts, sports |
 | `night-out` | hype pacing, neon filter, glowing text | bars, clubs, dinners, city lights |
-| `travel` | whip pans, warm grade, typewriter stamps (`SAT · 10:00 · ALFAMA`) | trips, exploring, life abroad |
+| `travel` | whip pans, warm grade, typewriter font for labels | trips, exploring, life abroad |
 | `golden` | a bit slower, light leaks, warm grade | cozy weekends, brunch, sunsets |
 
 Ask for one ("make it night-out style") or let Claude pick from the footage.
@@ -66,7 +72,8 @@ in CapCut (Settings → Drafts location), set it once with:
    the new draft (restart CapCut if it doesn't appear).
 4. Tweak anything in CapCut, export, and post with the caption Claude wrote.
 
-Want changes? Just say "shorter", "start with the sunset", "more chaotic", or "different
+Want changes? Just say "shorter", "start with the sunset", "no text on this one", "put back the
+beach clip", "more chaotic", or "different
 hook". Claude edits the plan and rebuilds the draft.
 
 **Keep the clips where they are.** The CapCut draft links to the original files.

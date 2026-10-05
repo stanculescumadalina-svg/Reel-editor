@@ -80,30 +80,64 @@ def test_beat_tracking_finds_tempo_and_loud_part(clips):
     assert grid.beats[beatlib.pick_start_beat(grid, 16)] >= 13
 
 
+PLAN = {
+    "title": "test", "style": "punchy", "music": "song.mp3", "hook": "POV: test",
+    "scenes": [
+        {"clip": "portrait.mp4", "beats": 2, "text": "SAT · 10:00"},
+        {"clip": "wide.mp4", "in": 2.7, "beats": 2},           # less than a beat left: must slow down
+        {"clip": "photo.jpg", "beats": 1},
+        {"clip": "phone.mov", "beats": 16},                    # 8s from a 3s clip: must shorten
+    ],
+    "outro": "follow for more",
+}
+
+
+def _used_range(shot):
+    return shot.source_in, shot.source_in + int(shot.duration * shot.speed)
+
+
 @needs_ffmpeg
 def test_timeline_is_beat_aligned_and_respects_clip_length(clips):
-    plan = {
-        "title": "test", "style": "punchy", "music": "song.mp3", "hook": "POV: test",
-        "scenes": [
-            {"clip": "portrait.mp4", "beats": 2, "text": "SAT · 10:00"},
-            {"clip": "wide.mp4", "in": 2.5, "beats": 2},           # `in` too late: must be pulled back
-            {"clip": "photo.jpg", "beats": 1},
-            {"clip": "phone.mov", "beats": 16},                    # 8s from a 3s clip: must slow down
-        ],
-        "outro": "follow for more",
-    }
-    tl = build_timeline(plan, clips)
+    tl = build_timeline(PLAN, clips)
     beat = 0.5 * US
     assert tl.shots[0].start == 0
     for a, b in zip(tl.shots, tl.shots[1:]):
         assert a.start + a.duration == b.start                 # no gaps or overlaps
-    assert [round(s.duration / beat) for s in tl.shots] == [2, 2, 1, 16]
+    assert [round(s.duration / beat) for s in tl.shots] == [2, 2, 1, 5]
     wide = tl.shots[1]
-    assert wide.source_in + wide.duration * wide.speed <= 3 * US
+    assert wide.source_in == int(2.7 * US) and _used_range(wide)[1] <= 3 * US
+    assert wide.speed < 0.5
     assert wide.blur_background and not tl.shots[0].blur_background
-    assert tl.shots[3].speed < 0.4 and tl.warnings
+    assert len(tl.warnings) == 2
     assert {c.role for c in tl.captions} == {"hook", "label", "outro"}
     assert tl.music_offset >= 13 * US
+    assert tl.unused == []
+
+
+@needs_ffmpeg
+def test_only_the_usable_window_is_used(clips):
+    plan = {"music": "song.mp3", "scenes": [
+        {"clip": "portrait.mp4", "in": 1.0, "out": 2.2, "beats": 4},                  # 1.2s usable → 2 beats
+        {"clip": "portrait.mp4", "in": 0.5, "out": 3.5, "beats": 2, "align": "end"},  # last second of window
+        {"clip": "phone.mov", "in": 1.0, "out": 1.3, "beats": 1},                     # 0.3s → slowed
+    ]}
+    tl = build_timeline(plan, clips)
+    a, b, c = tl.shots
+    assert round(a.duration / (0.5 * US)) == 2
+    assert int(1.0 * US) <= _used_range(a)[0] and _used_range(a)[1] <= int(2.2 * US)
+    assert _used_range(b)[1] == pytest.approx(3.5 * US, abs=2000)
+    assert int(1.0 * US) <= _used_range(c)[0] and _used_range(c)[1] <= int(1.3 * US) and c.speed < 1
+    assert set(tl.unused) == {"wide.mp4", "photo.jpg"}
+    with pytest.raises(ValueError):
+        build_timeline({"scenes": [{"clip": "portrait.mp4", "in": 2, "out": 1}]}, clips)
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("mode,roles", [("none", set()), ("hook", {"hook", "outro"}),
+                                        ("story", {"hook", "outro", "label"})])
+def test_text_modes(clips, mode, roles):
+    tl = build_timeline(PLAN | {"text_mode": mode}, clips)
+    assert {c.role for c in tl.captions} == roles
 
 
 @needs_ffmpeg

@@ -20,6 +20,13 @@ CANVAS_W, CANVAS_H = 1080, 1920
 FPS = 30
 MAX_LABEL_US = int(2.6 * US)   # a label holds until the next one, but no longer than this
 
+# Which on-screen text each text_mode keeps.
+TEXT_MODES = {
+    "none": set(),                          # clean footage + music only
+    "hook": {"hook", "outro"},              # just the opening line (and closing line, if any)
+    "story": {"hook", "outro", "label"},    # plus scene labels wherever the plan has them
+}
+
 
 @dataclass
 class Shot:
@@ -60,6 +67,9 @@ class Timeline:
     music_offset: int          # where in the song the reel starts (µs)
     caption_text: str
     warnings: list[str] = field(default_factory=list)
+    text_mode: str = "story"
+    unused: list[str] = field(default_factory=list)         # clips in the folder the reel doesn't use
+    skipped: dict[str, str] = field(default_factory=dict)   # Claude's reasons for leaving clips out
 
 
 def load_plan(path: Path) -> dict:
@@ -100,6 +110,18 @@ def fill_scale(width: int, height: int) -> float:
     return fill / fit
 
 
+def _window(scene: dict, info: dict) -> tuple[float, float]:
+    """The usable part of a clip for this scene, in seconds: `in` to `out` (default: the whole clip)."""
+    if info["kind"] != "video":
+        return 0.0, 0.0
+    end = max(0.0, info["duration"] - 0.05)  # stay clear of the last frame
+    w_in = min(max(0.0, float(scene.get("in", 0.0))), end)
+    w_out = min(float(scene["out"]), end) if scene.get("out") is not None else end
+    if w_out <= w_in:
+        raise ValueError(f"Scene with clip '{scene['clip']}': 'out' ({w_out}s) must be after 'in' ({w_in}s)")
+    return w_in, w_out
+
+
 def _seconds_to_beat_index(grid: beatlib.BeatGrid, seconds: float) -> int:
     for i, b in enumerate(grid.beats):
         if b >= seconds - 0.05:
@@ -117,14 +139,27 @@ def build_timeline(plan: dict, folder: Path, grid: Optional[beatlib.BeatGrid] = 
     for s in scenes:
         if s["clip"] not in clips:
             raise ValueError(f"Clip '{s['clip']}' isn't in clips.json. Known clips: {', '.join(clips)}")
-    scene_beats = [int(s.get("beats", style.beats_per_cut)) for s in scenes]
-    total_beats = sum(scene_beats)
 
     music = Path(folder, plan["music"]) if plan.get("music") else None
     if music is not None and not music.exists():
         raise ValueError(f"Music file not found: {music}")
     if grid is None:
         grid = beatlib.analyze(music) if music else beatlib.fixed_grid(float(plan.get("bpm", 120)), 600)
+
+    # Each scene may only use footage inside its usable window [in, out].
+    windows = [_window(s, clips[s["clip"]]) for s in scenes]
+    scene_beats = []
+    for i, (scene, (w_in, w_out)) in enumerate(zip(scenes, windows)):
+        n_beats = int(scene.get("beats", style.beats_per_cut))
+        if clips[scene["clip"]]["kind"] == "video":
+            speed = float(scene.get("speed", 1.0))
+            fits = int((w_out - w_in) / (grid.period * speed * 1.02))  # 2% slack for tempo wobble
+            if 1 <= fits < n_beats:
+                warnings.append(f"scene {i + 1} ({scene['clip']}): only {w_out - w_in:.1f}s usable "
+                                f"({w_in:.1f}-{w_out:.1f}s), shortened from {n_beats} to {fits} beats")
+                n_beats = fits
+        scene_beats.append(n_beats)
+    total_beats = sum(scene_beats)
 
     start_setting = plan.get("music_start", "auto")
     if music is None:
@@ -146,18 +181,20 @@ def build_timeline(plan: dict, folder: Path, grid: Optional[beatlib.BeatGrid] = 
         cursor += n_beats
         duration = end - start
         speed = float(scene.get("speed", 1.0))
-        source_in = int(round(float(scene.get("in", 0.0)) * US))
+        w_in, w_out = (int(round(t * US)) for t in windows[i])
+        source_in = w_in
 
         if info["kind"] == "video":
-            clip_len = int(info["duration"] * US) - 50_000  # stay clear of the last frame
+            usable = w_out - w_in
             need = int(duration * speed)
-            if need > clip_len:
-                speed = round(max(0.1, clip_len / duration), 3)
-                warnings.append(f"scene {i + 1} ({scene['clip']}): clip too short for {n_beats} beats, "
-                                f"slowed to {speed}x")
+            if need > usable:
+                # Even one beat doesn't fit: slow the footage down rather than leave the window.
+                speed = round(max(0.1, usable / duration), 3)
+                warnings.append(f"scene {i + 1} ({scene['clip']}): usable part too short for "
+                                f"{n_beats} beat(s), slowed to {speed}x")
                 need = int(duration * speed)
-            if source_in + need > clip_len:
-                source_in = max(0, clip_len - need)
+            if scene.get("align") == "end":
+                source_in = max(w_in, w_out - need)
         else:
             speed, source_in = 1.0, 0
 
@@ -189,7 +226,12 @@ def build_timeline(plan: dict, folder: Path, grid: Optional[beatlib.BeatGrid] = 
         ))
 
     total = times[total_beats]
-    captions = _captions(plan, shots, scenes, times, total)
+    text_mode = plan.get("text_mode", "story")
+    if text_mode not in TEXT_MODES:
+        raise ValueError(f"text_mode must be one of: {', '.join(TEXT_MODES)}")
+    captions = [c for c in _captions(plan, shots, scenes, times, total) if c.role in TEXT_MODES[text_mode]]
+    used = {s["clip"] for s in scenes}
+    unused = [name for name in clips if name not in used]
     caption_text = plan.get("caption", "").strip()
     if plan.get("hashtags"):
         tags = " ".join(t if t.startswith("#") else f"#{t}" for t in plan["hashtags"])
@@ -199,6 +241,7 @@ def build_timeline(plan: dict, folder: Path, grid: Optional[beatlib.BeatGrid] = 
         title=plan.get("title", "My reel"), style=style, shots=shots, captions=captions,
         duration=total, bpm=grid.bpm, music=music, music_offset=music_offset,
         caption_text=caption_text, warnings=warnings,
+        text_mode=text_mode, unused=unused, skipped=dict(plan.get("skipped") or {}),
     )
 
 

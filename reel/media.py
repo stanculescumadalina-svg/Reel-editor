@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass, field
@@ -14,7 +15,8 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp"}
 AUDIO_EXTS = {".mp3", ".m4a", ".wav", ".aac", ".flac", ".ogg"}
 
 WORK_DIR = "_reel"
-FRAMES_PER_SHEET = 6  # 3 columns x 2 rows
+MIN_FRAMES_PER_SHEET = 6   # 3 columns x 2 rows
+MAX_FRAMES_PER_SHEET = 12  # 4 columns x 3 rows
 
 
 @dataclass
@@ -110,7 +112,8 @@ def probe(path: Path, folder: Path) -> Optional[Clip]:
 
 
 def make_sheet(clip: Clip, folder: Path, out_dir: Path) -> None:
-    """Write a 3x2 grid of evenly spaced frames so Claude can 'watch' the clip."""
+    """Write a grid of evenly spaced frames so Claude can 'watch' the clip and find
+    which part of it is usable. Longer clips get more frames (one every ~1.5 s, 6 to 12)."""
     src = folder / clip.file
     out = out_dir / (Path(clip.file).stem + ".jpg")
     if clip.kind == "image":
@@ -118,17 +121,19 @@ def make_sheet(clip: Clip, folder: Path, out_dir: Path) -> None:
               "-vf", "scale=480:-2", "-frames:v", "1", str(out)])
         clip.sheet_times = [0.0]
     else:
-        n = FRAMES_PER_SHEET
+        n = min(MAX_FRAMES_PER_SHEET, max(MIN_FRAMES_PER_SHEET, math.ceil(clip.duration / 1.5)))
+        cols = 3 if n <= 6 else 4
+        size = 360 if cols == 3 else 300
         step = clip.duration / n
         clip.sheet_times = [round(step * (i + 0.5), 2) for i in range(n)]
         # Seek to each timestamp separately: fast and accurate even for long clips.
         inputs: list[str] = []
         for t in clip.sheet_times:
             inputs += ["-ss", f"{t:.2f}", "-i", str(src)]
-        scaled = "".join(f"[{i}:v]scale=360:360:force_original_aspect_ratio=decrease,"
-                         f"pad=360:360:(ow-iw)/2:(oh-ih)/2,setsar=1[f{i}];" for i in range(n))
+        scaled = "".join(f"[{i}:v]scale={size}:{size}:force_original_aspect_ratio=decrease,"
+                         f"pad={size}:{size}:(ow-iw)/2:(oh-ih)/2,setsar=1[f{i}];" for i in range(n))
         grid = "".join(f"[f{i}]" for i in range(n))
-        layout = "|".join(f"{(i % 3) * 360}_{(i // 3) * 360}" for i in range(n))
+        layout = "|".join(f"{(i % cols) * size}_{(i // cols) * size}" for i in range(n))
         _run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex",
               f"{scaled}{grid}xstack=inputs={n}:layout={layout}[out]",
               "-map", "[out]", "-frames:v", "1", "-q:v", "4", str(out)])

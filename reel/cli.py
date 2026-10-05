@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import beats as beatlib
 from .media import AUDIO_EXTS, WORK_DIR, require_ffmpeg, scan
-from .plan import US, build_timeline, clips_folder_for, load_plan
+from .plan import TEXT_MODES, US, build_timeline, clips_folder_for, load_plan
 from .styles import STYLES
 
 
@@ -49,11 +49,19 @@ def _timeline(args):
     folder = clips_folder_for(plan_path, plan)
     if args.style:
         plan["style"] = args.style
+    if args.text:
+        plan["text_mode"] = args.text
     tl = build_timeline(plan, folder)
-    print(f"'{tl.title}': {len(tl.shots)} shots, {tl.duration / US:.1f}s at {tl.bpm:.0f} BPM, style '{tl.style.name}'"
+    print(f"'{tl.title}': {len(tl.shots)} shots, {tl.duration / US:.1f}s at {tl.bpm:.0f} BPM, "
+          f"style '{tl.style.name}', text '{tl.text_mode}'"
           + (f", music from {tl.music_offset / US:.1f}s" if tl.music else ", no music (add a sound in CapCut)"))
     for w in tl.warnings:
         print(f"  ! {w}")
+    if tl.unused:
+        print(f"  Not used ({len(tl.unused)}):")
+        for name in tl.unused:
+            reason = tl.skipped.get(name)
+            print(f"    - {name}" + (f": {reason}" if reason else ""))
     return tl, folder
 
 
@@ -89,7 +97,9 @@ def cmd_preview(args) -> None:
 def cmd_timeline(args) -> None:
     tl, _ = _timeline(args)
     rows = [{"clip": s.clip, "start": round(s.start / US, 3), "duration": round(s.duration / US, 3),
-             "in": round(s.source_in / US, 3), "speed": s.speed, "transition": s.transition}
+             "uses": [round(s.source_in / US, 2), round((s.source_in + s.duration * s.speed) / US, 2)]
+             if s.kind == "video" else "photo",
+             "speed": s.speed, "transition": s.transition}
             for s in tl.shots]
     caps = [{"role": c.role, "text": c.text, "start": round(c.start / US, 3), "duration": round(c.duration / US, 3)}
             for c in tl.captions]
@@ -119,6 +129,8 @@ def main(argv=None) -> None:
         s = sub.add_parser(name, help=helptext)
         s.add_argument("plan", help="path to plan.json (usually <clips>/_reel/plan.json)")
         s.add_argument("--style", choices=list(STYLES), help="override the plan's style")
+        s.add_argument("--text", choices=list(TEXT_MODES),
+                       help="override on-screen text: none, hook (opening/closing line only) or story (+ scene labels)")
         if name == "build":
             s.add_argument("--drafts", help="CapCut drafts folder (auto-detected on Windows/Mac)")
             s.add_argument("--name", help="draft name (defaults to the plan title)")
