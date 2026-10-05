@@ -1,0 +1,77 @@
+{
+  "title": "Lisbon weekend 1",
+  "style": "travel",
+  "music": "song.mp3",
+  "music_start": "auto",
+  "hook": "POV: your first weekend living in Lisbon",
+  "hook_beats": 4,
+  "scenes": [
+    {
+      "clip": "IMG_2041.MOV",
+      "in": 3.5,
+      "beats": 2,
+      "emphasis": true,
+      "note": "tram passing - hook shot"
+    },
+    {
+      "clip": "IMG_2033.MOV",
+      "in": 0.0,
+      "beats": 2,
+      "text": "SAT · 10:00 · BAIXA",
+      "note": "coffee pour"
+    },
+    {
+      "clip": "IMG_2034.JPG",
+      "beats": 1,
+      "note": "pastel de nata photo"
+    },
+    {
+      "clip": "IMG_2050.MOV",
+      "in": 12.0,
+      "beats": 2,
+      "speed": 2.0,
+      "note": "walking up the hill, sped up"
+    },
+    {
+      "clip": "IMG_2061.MOV",
+      "in": 4.0,
+      "beats": 2,
+      "text": "SAT · 16:00 · CASCAIS",
+      "transition": "Whip_Tear"
+    },
+    {
+      "clip": "IMG_2063.MOV",
+      "in": 0.0,
+      "beats": 2,
+      "keep_audio": true,
+      "note": "waves"
+    },
+    {
+      "clip": "IMG_2077.MOV",
+      "in": 1.0,
+      "beats": 8,
+      "speed": 0.5,
+      "emphasis": true,
+      "note": "sunset hold, slow-mo"
+    },
+    {
+      "clip": "IMG_2090.MOV",
+      "in": 2.0,
+      "beats": 2,
+      "text": "SAT · 22:00 · BAIRRO ALTO"
+    },
+    {
+      "clip": "IMG_2093.MOV",
+      "in": 0.5,
+      "beats": 4,
+      "note": "friends cheers"
+    }
+  ],
+  "outro": "save this for your Lisbon trip ✈️",
+  "caption": "first weekend as a Lisbon local 🇵🇹 still can't believe I live here",
+  "hashtags": [
+    "lisbon",
+    "expatlife",
+    "weekendvlog"
+  ]
+}

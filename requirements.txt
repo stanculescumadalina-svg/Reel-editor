@@ -1,0 +1,2 @@
+pycapcut==0.0.3
+numpy>=1.24
